@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Temporary files and uploads
+temp/
+tmp/
+uploads/
+*.csv
+
+# Editor files
+.vscode/
+.idea/
