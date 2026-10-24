@@ -1,0 +1,1 @@
+export default function Footer() { return <footer className="mt-20 border-t border-line py-8 text-xs text-neutral-600"><span className="font-semibold text-neutral-400">yoohoo.</span> Real videos. Real people. <span className="ml-2">Built for a better internet.</span></footer>; }
