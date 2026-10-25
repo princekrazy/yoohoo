@@ -17,8 +17,9 @@ export const api = {
   async getVideo(id: string) { return isReal ? request<Video>(`/videos/${id}`) : mockVideos.find((video) => video.id === id); },
   async getAnalysis(id: string) { return isReal ? request<AnalysisResult>(`/videos/${id}/analysis`) : mockVideos.find((video) => video.id === id)?.analysis; },
   async submitVideo(file: File, metadata: Record<string, string>) {
-    if (!isReal) { await new Promise((resolve) => setTimeout(resolve, 1800)); return { status: "approved" as const, explanation: "Demo result only: no backend detector was contacted.", provenanceStatus: "not_checked" as const, isMock: true }; }
+    if (!isReal) { await new Promise((resolve) => setTimeout(resolve, 1800)); return { status: "review_required" as const, explanation: "Demo mode did not contact the authenticity detector. This upload has not been approved for publication.", provenanceStatus: "not_checked" as const, isMock: true }; }
     const form = new FormData(); form.append("file", file); Object.entries(metadata).forEach(([key, value]) => form.append(key, value));
-    return request<AnalysisResult>("/videos", { method: "POST", body: form });
+    const response = await request<{ status: string; detection?: { mean_probability?: number; message?: string }; filename?: string }>("/api/videos/analyze", { method: "POST", body: form });
+    return { status: "review_required" as const, explanation: response.detection?.message || "The detector completed. Review is required before publication.", score: response.detection?.mean_probability, provenanceStatus: "unavailable" as const };
   },
 };
