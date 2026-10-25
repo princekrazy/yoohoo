@@ -1,1 +1,1 @@
-export default function Footer() { return <footer className="mt-20 border-t border-line py-8 text-xs text-neutral-600"><span className="font-semibold text-white">yoohoo<span className="text-coral">.</span></span> Share what moves you. <span className="ml-2">Built for real creators.</span></footer>; }
+export default function Footer() { return <footer className="mt-20 py-8 text-xs text-neutral-600"><span className="font-semibold text-primary">yoohoo.</span> Share what moves you. <span className="ml-2">Built for real creators.</span></footer>; }
