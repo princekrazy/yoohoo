@@ -136,10 +136,17 @@ def analyze_with_nvidia(video_path: str) -> dict:
             or "Detection completed successfully!" not in result.stdout
             or not csv_path.is_file()
         ):
-            # Avoid returning environment variables or the API key.
-            raise RuntimeError(
-                "NVIDIA detection failed. Check the detector logs."
+            # Collect diagnostic output without exposing the API key.
+            stdout = (result.stdout or "").replace(api_key, "[REDACTED]")
+            stderr = (result.stderr or "").replace(api_key, "[REDACTED]")
+
+            details = (
+                f"Exit code: {result.returncode}\n"
+                f"STDOUT:\n{stdout[-2500:] or '(empty)'}\n"
+                f"STDERR:\n{stderr[-2500:] or '(empty)'}"
             )
+
+            raise RuntimeError(f"NVIDIA detection failed.\n{details}")
 
         with csv_path.open(newline="", encoding="utf-8") as csv_file:
             rows = list(csv.DictReader(csv_file))
