@@ -1,11 +1,224 @@
 "use client";
-import Link from "next/link";
-import { Check, FileVideo, RefreshCw, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import UploadDropzone from "@/components/UploadDropzone";
-import VerificationStatus from "@/components/VerificationStatus";
-import { api } from "@/lib/api";
-import { AnalysisResult, VerificationStatus as Status } from "@/lib/types";
 
-const maxSize = 500 * 1024 * 1024;
-export default function UploadPage() { const [file, setFile] = useState<File>(); const [preview, setPreview] = useState(""); const [error, setError] = useState(""); const [status, setStatus] = useState<Status>("idle"); const [result, setResult] = useState<AnalysisResult>(); const [title, setTitle] = useState(""); const [description, setDescription] = useState(""); const [category, setCategory] = useState("Travel"); useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]); const select = (next: File) => { setError(""); if (!next.type.startsWith("video/")) return setError("Please choose an MP4, MOV, or WebM video."); if (next.size > maxSize) return setError("That file is over the 500MB limit."); setFile(next); setPreview(URL.createObjectURL(next)); setStatus("selected"); setResult(undefined); }; const submit = async (e: React.FormEvent) => { e.preventDefault(); if (!file) return setError("Choose a video before submitting."); if (!title.trim()) return setError("Add a title for your video."); try { setError(""); setStatus("uploading"); await new Promise((r) => setTimeout(r, 700)); setStatus("processing"); const response = await api.submitVideo(file, { title, description, category }); setResult(response); setStatus(response.status); } catch (err) { setStatus("error"); setError(err instanceof Error ? err.message : "Upload failed. Please try again."); } }; return <div className="mx-auto max-w-4xl"><div className="mb-8"><p className="text-xs font-bold uppercase tracking-[.18em] text-lime">Creator studio</p><h1 className="mt-2 text-3xl font-bold tracking-tight">Share something real</h1><p className="mt-2 text-sm text-neutral-500">Upload a video and we’ll prepare it for a Yoohoo audience.</p></div>{!file ? <UploadDropzone onFile={select} /> : <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[1.1fr_.9fr]"><div><div className="relative aspect-video overflow-hidden rounded-2xl border border-line bg-black">{preview && <video src={preview} controls className="h-full w-full" />}<button type="button" onClick={() => { setFile(undefined); setPreview(""); setStatus("idle"); }} aria-label="Remove selected video" className="absolute right-3 top-3 rounded-full bg-black/70 p-2 text-neutral-300 hover:text-white"><X size={16} /></button></div><div className="mt-3 flex items-center justify-between rounded-xl border border-line bg-panel px-4 py-3 text-sm"><span className="flex min-w-0 items-center gap-2 truncate"><FileVideo size={16} className="shrink-0 text-lime" />{file.name}</span><span className="ml-3 shrink-0 text-xs text-neutral-500">{(file.size / 1024 / 1024).toFixed(1)} MB</span></div><button type="button" onClick={() => { setFile(undefined); setPreview(""); setStatus("idle"); }} className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-neutral-500 hover:text-white"><RefreshCw size={13} /> Replace video</button></div><div className="space-y-4"><label className="block text-sm font-medium">Title<input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} placeholder="Give your video a title" className="mt-2 w-full rounded-xl border border-line bg-panel px-4 py-3 text-sm outline-none placeholder:text-neutral-600 focus:border-lime" /></label><label className="block text-sm font-medium">Description<textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} placeholder="What should people know?" className="mt-2 w-full resize-none rounded-xl border border-line bg-panel px-4 py-3 text-sm outline-none placeholder:text-neutral-600 focus:border-lime" /></label><label className="block text-sm font-medium">Category<select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-2 w-full rounded-xl border border-line bg-panel px-4 py-3 text-sm outline-none focus:border-lime">{["Travel", "People", "Education", "Vlogs", "Nature", "Technology"].map((item) => <option key={item}>{item}</option>)}</select></label>{error && <p role="alert" className="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-300">{error}</p>}<button disabled={status === "uploading" || status === "processing"} className="flex w-full items-center justify-center gap-2 rounded-xl bg-lime px-5 py-3 text-sm font-bold text-ink transition hover:bg-[#dafa83] disabled:cursor-wait disabled:opacity-60">{status === "uploading" || status === "processing" ? <><RefreshCw size={16} className="animate-spin" /> {status === "uploading" ? "Uploading..." : "Preparing analysis..."}</> : <><Check size={16} /> Upload & check video</>}</button></div>{result && <div className="lg:col-span-2"><VerificationStatus result={result} /></div>}</form>}<div className="mt-10 rounded-2xl border border-line bg-panel/50 p-5 text-xs leading-5 text-neutral-500"><strong className="text-neutral-300">A note on verification:</strong> Yoohoo’s check is a signal, not a guarantee. A passing detector result does not prove a video is authentic, and missing provenance credentials do not prove it is AI-generated. This upload currently runs in <span className="font-medium text-lime">{api.mode} mode</span>. <Link href="/" className="text-lime hover:underline">Back to feed</Link></div></div>; }
+import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+import { playRejectionSound } from "@/lib/feedback";
+import { addAcceptedVideo } from "@/lib/accepted-videos";
+
+const API = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "");
+const SYNTHETIC_THRESHOLD = 0.3;
+
+type UploadResponse = {
+  status?: string;
+  detection?: {
+    mean_probability?: number;
+    threshold?: number;
+    decision?: "accept" | "reject";
+    message?: string;
+  };
+};
+
+export default function UploadPage() {
+  const router = useRouter();
+
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [outcome, setOutcome] = useState<
+    "approved" | "rejected" | "error" | null
+  >(null);
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setOutcome(null);
+
+    if (!file || !title.trim()) {
+      setMessage("Add a title and choose a video.");
+      setOutcome("error");
+      return;
+    }
+
+    // The current NVIDIA detector integration supports MP4 only.
+    if (!file.name.toLowerCase().endsWith(".mp4")) {
+      setMessage("Please upload an MP4 video for AI detection.");
+      setOutcome("error");
+      return;
+    }
+
+    if (!API) {
+      setMessage("API URL is missing. Check your frontend .env.local file.");
+      setOutcome("error");
+      return;
+    }
+
+    const form = new FormData();
+    form.append("title", title.trim());
+    form.append("file", file);
+
+    setBusy(true);
+    setMessage("Uploading and analyzing your video...");
+
+    try {
+      const response = await fetch(`${API}/api/videos/analyze`, {
+        method: "POST",
+        body: form,
+      });
+
+      const result: UploadResponse & { detail?: string } =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || "Upload or video analysis failed.");
+      }
+
+      const detection = result.detection;
+      const score = detection?.mean_probability;
+      const threshold = detection?.threshold ?? SYNTHETIC_THRESHOLD;
+
+      // Prefer the backend's explicit decision, then fall back to its score.
+      let rejected: boolean;
+
+      if (result.status === "rejected" || detection?.decision === "reject") {
+        rejected = true;
+      } else if (
+        result.status === "approved" ||
+        result.status === "published" ||
+        detection?.decision === "accept"
+      ) {
+        rejected = false;
+      } else if (typeof score === "number") {
+        rejected = score >= threshold;
+      } else {
+        throw new Error(
+          "The detector response did not contain a usable decision or score.",
+        );
+      }
+
+      if (rejected) {
+        setOutcome("rejected");
+        setMessage(
+          `Upload rejected: this video was flagged as likely AI-generated. ` +
+            (typeof score === "number"
+              ? `Synthetic score: ${(score * 100).toFixed(1)}%. `
+              : "") +
+            "You can try another video.",
+        );
+
+        playRejectionSound();
+        return;
+      }
+
+      // Only accepted videos are added to the home feed.
+      addAcceptedVideo(file, {
+        title: title.trim(),
+        description: "",
+        category: "Vlogs",
+      });
+
+      setOutcome("approved");
+      setMessage(
+        `Video accepted! ${
+          typeof score === "number"
+            ? `Synthetic score: ${(score * 100).toFixed(1)}%. `
+            : ""
+        }Your video is ready for the Yoohoo home feed.`,
+      );
+    } catch (error) {
+      setOutcome("error");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto max-w-xl p-6">
+      <h1 className="mb-2 text-3xl font-bold">Upload to Yoohoo</h1>
+      <p className="mb-6 text-sm text-neutral-500">
+        Every video is checked before it can appear in the community feed.
+      </p>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <label className="block">
+          Video title
+          <input
+            className="mt-1 w-full rounded border p-3"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={150}
+            required
+            disabled={busy}
+          />
+        </label>
+
+        <label className="block">
+          Choose a video (MP4)
+          <input
+            className="mt-1 block w-full"
+            type="file"
+            accept="video/mp4,.mp4"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            required
+            disabled={busy}
+          />
+        </label>
+
+        {file && (
+          <p className="text-sm text-neutral-500">
+            Selected: {file.name} ({(file.size / (1024 * 1024)).toFixed(1)} MB)
+          </p>
+        )}
+
+        <button
+          className="rounded bg-black px-5 py-3 text-white disabled:opacity-50"
+          disabled={busy}
+          type="submit"
+        >
+          {busy ? "Analyzing..." : "Upload video"}
+        </button>
+      </form>
+
+      {message && (
+        <div
+          className={`mt-5 rounded-lg border p-4 ${
+            outcome === "approved"
+              ? "border-green-500/40 bg-green-500/10 text-green-700"
+              : outcome === "rejected"
+                ? "border-red-500/40 bg-red-500/10 text-red-700"
+                : outcome === "error"
+                  ? "border-orange-500/40 bg-orange-500/10"
+                  : "border-neutral-500/30"
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          <p className="font-semibold">
+            {outcome === "approved"
+              ? "✓ Video accepted"
+              : outcome === "rejected"
+                ? "✕ Video rejected"
+                : outcome === "error"
+                  ? "Upload failed"
+                  : "Analyzing video"}
+          </p>
+          <p className="mt-1 text-sm">{message}</p>
+
+          {outcome === "approved" && (
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="mt-3 rounded bg-black px-4 py-2 text-sm font-semibold text-white"
+            >
+              View home feed
+            </button>
+          )}
+        </div>
+      )}
+    </main>
+  );
+}
