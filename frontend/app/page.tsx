@@ -141,11 +141,7 @@ export default function Home() {
           </div>
         </div>
 
-        <VideoFeed
-          searchQuery={query}
-          selectedCategory={category}
-          onClearFilters={clearFilters}
-        />
+        <VideoFeed />
       </section>
 
       <Footer />
