@@ -1,22 +1,11 @@
 export function playRejectionSound() {
   try {
-    const context = new AudioContext();
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
+    const audio = new Audio("/sounds/yoohoo.mp3");
+    audio.volume = 0.7;
 
-    oscillator.type = "square";
-    oscillator.frequency.value = 660;
-    gain.gain.value = 0.12;
-
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-
-    oscillator.start();
-    oscillator.stop(context.currentTime + 0.25);
-
-    oscillator.onended = () => {
-      void context.close();
-    };
+    void audio.play().catch((error) => {
+      console.warn("Could not play rejection sound:", error);
+    });
   } catch (error) {
     console.warn("Could not play rejection sound:", error);
   }
