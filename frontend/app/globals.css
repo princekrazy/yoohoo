@@ -4,12 +4,32 @@
 
 :root { color-scheme: dark; }
 * { box-sizing: border-box; }
-body { margin: 0; background: #090b0c; color: #f3f5f4; font-family: Arial, Helvetica, sans-serif; }
+body { margin: 0; background: #18191B; color: #F1F1F1; font-family: Arial, Helvetica, sans-serif; }
+html, body { min-width: 0; overflow-x: hidden; }
 a { color: inherit; text-decoration: none; }
 button, input, textarea, select { font: inherit; }
-button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid #c9f458; outline-offset: 3px; }
-.page-shell { min-height: 100vh; background: radial-gradient(circle at 84% -15%, rgba(201,244,88,.08), transparent 32%), #090b0c; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid #B8B9BE; outline-offset: 3px; }
+.page-shell { min-height: 100vh; background: #18191B; }
 .text-balance { text-wrap: balance; }
 .line-clamp-2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { scrollbar-width: none; }
+.reference-pill { border-radius: 10px; transition: background .2s, color .2s; }
+.reference-pill:hover { background: #303136; color: #F1F1F1; }
+.brand-mark { color: #F1F1F1; }
+.surface { background: #242528; }
+.youtube-thumb { aspect-ratio: 16 / 9; }
+main { transition: padding .2s ease-out; }
+
+/* Keep legacy status/accent utilities monochrome while shared pages migrate to named tokens. */
+[class*="bg-red"], [class*="bg-amber"], [class*="bg-sky"], [class*="bg-coral"] { background-color: #303136 !important; }
+[class*="text-red"], [class*="text-amber"], [class*="text-sky"], [class*="text-coral"], [class*="text-lime"] { color: #B8B9BE !important; }
+[class*="border-red"], [class*="border-amber"], [class*="border-sky"], [class*="border-coral"] { border-color: #3A3B40 !important; }
+[class*="border-line"] { border-color: transparent !important; }
+input[class*="border-line"], textarea[class*="border-line"], select[class*="border-line"], form[class*="border-line"] { border-color: #3A3B40 !important; }
+[class*="bg-gradient"] { background-image: none !important; background-color: #292A2D !important; }
+.hover\:bg-\[\#ff6262\]:hover { background-color: #38393D !important; }
+[aria-label="Profile"], [aria-label^="Visit "] { border-radius: 9999px !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}

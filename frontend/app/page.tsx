@@ -1,11 +1,64 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Search, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 import Footer from "@/components/Footer";
 import VideoFeed from "@/components/VideoFeed";
 
+const categories = [
+  "All",
+  "Travel",
+  "People",
+  "Education",
+  "Vlogs",
+  "Nature",
+  "Technology",
+];
+
 export default function Home() {
+  const [category, setCategory] = useState("All");
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      setQuery(params.get("q") || "");
+      setCategory(params.get("category") || "All");
+    };
+
+    syncFromUrl();
+    window.addEventListener("popstate", syncFromUrl);
+
+    return () => window.removeEventListener("popstate", syncFromUrl);
+  }, []);
+
+  function updateUrl(key: string, value: string) {
+    const params = new URLSearchParams(window.location.search);
+
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+
+    window.history.pushState(
+      null,
+      "",
+      params.toString() ? `/?${params.toString()}` : "/",
+    );
+
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }
+
+  function clearFilters() {
+    setQuery("");
+    setCategory("All");
+
+    window.history.pushState(null, "", "/");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }
+
   return (
     <>
       <section className="relative mb-9 overflow-hidden rounded-3xl border border-lime/15 bg-lime/5 px-6 py-8 sm:px-10 sm:py-10">
@@ -45,7 +98,54 @@ export default function Home() {
           <h2 className="mt-1 text-xl font-bold">Discover something real</h2>
         </div>
 
-        <VideoFeed />
+        <div className="mb-5 flex flex-col gap-4">
+          <div className="relative w-full sm:max-w-sm">
+            <Search
+              size={16}
+              className="absolute left-3 top-3 text-neutral-500"
+            />
+            <label htmlFor="feed-search" className="sr-only">
+              Search videos
+            </label>
+            <input
+              id="feed-search"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                updateUrl("q", e.target.value);
+              }}
+              placeholder="Search videos"
+              className="h-10 w-full rounded-xl border border-line bg-content pl-9 pr-3 text-sm outline-none focus:border-lime"
+            />
+          </div>
+
+          <div className="scrollbar-hide flex min-w-0 gap-2 overflow-x-auto pb-1">
+            {categories.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => {
+                  setCategory(item);
+                  updateUrl("category", item === "All" ? "" : item);
+                }}
+                aria-pressed={category === item}
+                className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  category === item
+                    ? "bg-lime text-ink"
+                    : "bg-panel text-secondary hover:bg-button-hover"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <VideoFeed
+          searchQuery={query}
+          selectedCategory={category}
+          onClearFilters={clearFilters}
+        />
       </section>
 
       <Footer />

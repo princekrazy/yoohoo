@@ -4,8 +4,11 @@ import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 
 export const metadata: Metadata = {
-  title: "Yoohoo — Real videos. Real people.",
+  title: "Yoohoo — Share what moves you",
   description: "A video-sharing platform for human-made stories.",
+  icons: {
+    icon: "/yoohoo-logo.svg",
+  },
 };
 
 export default function RootLayout({
@@ -16,9 +19,11 @@ export default function RootLayout({
       <body>
         <div className="page-shell">
           <Navbar />
+
           <div className="mx-auto flex max-w-[1440px]">
             <Sidebar />
-            <main className="min-w-0 flex-1 px-4 pb-16 pt-6 sm:px-6 lg:px-10">
+
+            <main className="min-w-0 flex-1 px-[clamp(1rem,3vw,2rem)] pb-16 pt-[clamp(1rem,2vw,1.25rem)]">
               {children}
             </main>
           </div>
